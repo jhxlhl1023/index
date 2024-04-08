@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>报告统计</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
+    <script defer>
+        (async () => {
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            await sleep(200);
+            const baseUrl = 'https://static1.coolbrainscience.cn';
+            (async () => {
+                const input = document.createElement('textarea');
+                input.style.width = '400px';
+                input.rows = 5;
+                const button = document.createElement('button');
+                button.innerText = "统计"
+                const report = document.createElement('pre');
+                document.body.appendChild(input);
+                document.body.appendChild(button);
+                document.body.appendChild(report)
+                button.onclick = async () => {
+                    report.innerText = "";
+                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
+                    (() => {
+                        const map = new Map();
+                        (data.originData.before || data.originData.before_cmd_str)?.forEach(([arr, signal]) => {
+                            const key = `${arr.length}-${signal}`;
+                            map.set(key, (map.get(key) || 0) + 1);
+                        });
+                        report.innerText += `befroe:\n${[...map.entries()].map(([k, v]) => `${k} => ${v}`).join("\n")}`;
+                    })();
+                    (() => {
+                        const map = new Map();
+                        (data.originData.after || data.originData.after_cmd_str)?.forEach(([arr, signal]) => {
+                            const key = `${arr.length}-${signal}`;
+                            map.set(key, (map.get(key) || 0) + 1);
+                        });
+                        report.innerText += `\n\nafter:\n${[...map.entries()].map(([k, v]) => `${k} => ${v}`).join("\n")}`;
+                    })();
+                };
+
+            })();
+        })();
+    </script>
+</head>
+
+<body>
+
+</body>
+
+</html>
