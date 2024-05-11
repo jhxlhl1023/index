@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>报告统计</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js"></script>
+    <script src="https://raw.githubusercontent.com/lodash/lodash/4.17.15-npm/lodash.js"></script>
+    <script src="./peb.js"></script>
+    <script defer>
+        (async () => {
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            await sleep(200);
+            const baseUrl = 'https://static1.coolbrainscience.cn';
+            (async () => {
+                const container = document.createElement('div');
+                Object.assign(container.style, {
+                    display: 'inline-flex',
+                    flexFlow: 'column nowrap',
+
+                });
+                const input = document.createElement('textarea');
+                input.style.width = '400px';
+                input.rows = 5;
+                const button = document.createElement('button');
+                button.innerText = "统计"
+                const button1 = document.createElement('button');
+                button1.innerText = "复制原始数据"
+                const button2 = document.createElement('button');
+                button2.innerText = "解析脑电数据";
+                const button3 = document.createElement('button');
+                button3.innerText = "画图";
+                const report = document.createElement('pre');
+                document.body.appendChild(container);
+                container.appendChild(input);
+                container.appendChild(button);
+                container.appendChild(button1);
+                container.appendChild(button2);
+                container.appendChild(button3);
+                container.appendChild(report);
+                // input value 初始值是 queryString 中的 location
+                input.value = new URLSearchParams(window.location.search).get('location') || '';
+                button.onclick = async () => {
+                    report.innerText = "";
+                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
+                    ['before', 'after', 'cache'].forEach((key) => {
+                        const map = new Map();
+                        (data.originData[key] || data.originData[`${key}_cmd_str`])?.forEach(([arr, signal]) => {
+                            const key = `${arr.length}-${signal}`;
+                            map.set(key, (map.get(key) || 0) + 1);
+                        });
+                        report.innerText += `\n\n${key}:relax-count:${data[key]?.relax.length},focus-count:${data[key]?.focus.length},\n\n${[...map.entries()].map(([k, v]) => `${k} => ${v}`).join("\n")}`;
+                    });
+                    report.innerText += '\n\n控制信号:\n\n' + data.originData.control
+                        //.filter(([, , value]) => !value.startsWith('aabb0213'))
+                        .map(([
+                            timestamp, type, value
+                        ], index, arr) => {
+                            const res = `${dayjs(timestamp).hour(0).minute(0).second(0).add(timestamp, 'millisecond').format('mm:ss')} ${type} ${value}`;
+                            if (arr[index - 1] && timestamp < arr[index - 1]?.[0]) {
+                                return `\n【设备重连】\n${res}`;
+                            } else {
+                                return res;
+                            }
+                        }).join('\n');
+                };
+                button1.onclick = async () => {
+                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
+                    const content = JSON.stringify(data.originData.before);
+                    // 复制到剪贴板
+                    (() => {
+                        const input = document.createElement('input');
+                        input.value = content;
+                        document.body.appendChild(input);
+                        input.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(input);
+                    })();
+                }
+                button2.onclick = () => {
+                    report.innerText = "";
+                    const parseBytes = parseEegBytes();
+                    const messages = input.value
+                        .split("\n")
+                        .filter((message) => {
+                            return !message.replace(/\s/g, "").toLowerCase().startsWith("aabb");
+                        })
+                        .filter(Boolean);
+                    const logMsgsArr = [];
+                    for (let i = 0; i < messages.length; i++) {
+                        const message = messages[i].toLowerCase();
+                        /** 
+                        /** @type { { type?: "sync" | "time" | "len" | "class" | "type" | "typeLen" | 'param' | 'check' | 'brain' | 'quality'; byte: string; log?: string } } */
+                        const logMsgs = parseBytes([
+                            ...message.replace(/\s/g, "").match(/../g),
+                        ]);
+                        logMsgsArr.push(logMsgs);
+                    }
+                    logMsgsArr.forEach((logMsgs) => {
+                        // 创建一行日志UI，根据不同的 type 使用红橙黄绿蓝靛紫等不同颜色
+                        const logDom = document.createElement('div');
+                        // 横向垂直居中
+                        const logs = [];
+                        logMsgs.forEach((msg) => {
+                            const { type, byte, log } = msg;
+                            const span = document.createElement('span');
+                            span.innerText = `${byte}`.toUpperCase();
+                            span.style.backgroundColor = ({
+                                "sync": "red", "len": "orange", "class": "green", "type": "blue", 'check': "brown", 'brain': "green", 'quality': "purple"
+                            })[type] || 'gray';
+                            logDom.appendChild(span);
+                            if (log) {
+                                logs.push(log);
+                            }
+                        });
+                        report.appendChild(logDom);
+                        if (logs.length > 0) {
+                            const pre = document.createElement('pre');
+                            pre.innerText = ["解析结果：", ...logs].join("\n");
+                            report.append(pre)
+                        }
+                    });
+                    report.className = "report-flex";
+                }
+                button3.onclick = async () => {
+                    report.innerHTML = "";
+                    if (button3.div) {
+                        document.body.removeChild(button3.div);
+                        button3.div = null;
+                    }
+                    const root = button3.div = document.createElement('div');
+                    document.body.appendChild(root);
+                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
+                    const draw = async (brain, title) => {
+                        const { focus, relax } = brain;
+                        if (!focus || !relax) {
+                            alert("数据不足，无法画图");
+                        }
+                        const container = document.createElement('div');
+                        root.appendChild(container);
+                        Object.assign(container.style, { width: '800px', height: '400px', });
+                        const chart = echarts.init(container);
+                        chart.setOption({
+                            title: { text: title },
+                            color: ['#73A8FF', '#987AF4'],
+                            xAxis: {
+                                type: 'category',
+                                data: Array(Math.max(130, focus.length, relax.length)).fill(null).map((_, i) => `${i}s`),
+                                splitNumber: 1,
+                            },
+                            yAxis: { type: 'value', splitNumber: 1, min: -100, max: 100 },
+                            series: [focus, relax].map((data, index) => {
+                                return { data: [null, ...data], type: 'line', smooth: true, name: ['放松度', '专注度'][index] }
+                            })
+                        });
+                        await sleep(100);
+                    }
+                    draw(data?.before?.real, "实时脑波图");
+                    draw(data?.cache?.real, "缓存脑波图");
+                }
+            })();
+        })();
+    </script>
+    <style>
+        .report-flex {
+            background-color: #33333310;
+            display: flex;
+            flex-flow: column nowrap;
+            gap: 0.5em;
+
+        }
+
+        .report-flex>div {
+            display: flex;
+            flex-flow: row nowrap;
+            align-items: center;
+            gap: 0.5em;
+        }
+
+        .report-flex>pre {
+            color: red;
+        }
+
+        .report-flex>div>span {
+            display: inline-block;
+            padding-right: 0.5em;
+            margin-right: -0.5em;
+            color: #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main"></div>
+</body>
+
+</html>
