@@ -68,7 +68,7 @@
                         ['1a', '工作阶段'],
                         ['1d', '软件版本'],
                         ['26', '硬件版本'],
-                        ['31', '电压'],
+                        ['31', { name: '电压', parse: (value) => value * 33 / 255 }],
                         ['30', '重置设备'],
                         ['16', '关机'],
                         ['25', '读取缓存']
@@ -79,9 +79,10 @@
                             timestamp, dire, command
                         ], index, arr) => {
                             const direction = dire === "GET" ? "接收" : "发送";
-                            const typeName = typeMap.get(command.substring(6, 8)) || "未知";
+                            const typeObj = typeMap.get(command.substring(6, 8)) || "未知";
+                            const [typeName, typeParse] = typeof typeObj === 'string' ? [typeObj, v => v] : [typeObj.name, typeObj.parse];
                             const value = parseInt(command.slice(8, -2), 16);
-                            const res = `${dayjs(timestamp).hour(0).minute(0).second(0).add(timestamp, 'millisecond').format('mm:ss')} ${dire} ${command} [${direction}: ${typeName}=${value}]`;
+                            const res = `${dayjs(timestamp).hour(0).minute(0).second(0).add(timestamp, 'millisecond').format('mm:ss')} ${dire} ${command} [${direction}: ${typeName}=${typeParse(value)}]`;
                             if (arr[index - 1] && timestamp < arr[index - 1]?.[0]) {
                                 return `\n【设备重连】\n${res}`;
                             } else {
