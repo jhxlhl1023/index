@@ -87,7 +87,7 @@
                             const typeObj = typeMap.get(command.substring(6, 8)) || "未知";
                             const [typeName, typeParse] = typeof typeObj === 'string' ? [typeObj, v => v] : [typeObj.name, typeObj.parse];
                             const value = parseInt(command.slice(8, -2), 16);
-                            const res = `${dayjs(timestamp).hour(0).minute(0).second(0).add(timestamp, 'millisecond').format('mm:ss')} ${dire} ${command} [${direction}: ${typeName}=${typeParse(value)}]`;
+                            const res = `${dayjs(timestamp).hour(0).minute(0).second(0).add(timestamp, 'millisecond').format('mm:ss')} ${dire} ${command.padEnd(14, ' ')}   [${direction}: ${typeName}=${typeParse(value)}]`;
                             if (arr[index - 1] && timestamp < arr[index - 1]?.[0]) {
                                 return `\n【设备重连】\n${res}`;
                             } else {
