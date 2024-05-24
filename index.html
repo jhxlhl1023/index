@@ -76,7 +76,7 @@
                         ['31', { name: '电压', parse: (value) => `${(value * 33 / 255).toFixed(2)}V` }],
                         ['32', '音量'],
                         ['33', '强度'],
-                        ['34', '引导'],
+                        ['34', '引导']
                     ]);
                     report.innerText += '\n\n控制信号:\n\n' + data.originData.control
                         //.filter(([, , value]) => !value.startsWith('aabb0213'))
