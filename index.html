@@ -226,7 +226,7 @@
                         });
                         await sleep(100);
                     }
-                    draw(data?.originData?.before.map(b => b[0] / 18).flat(), "电压");
+                    draw(data?.originData?.before.map(b => b[0]).flat().map(b => b / 18), "电压");
                 }
 
             })();
