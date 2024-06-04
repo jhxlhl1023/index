@@ -31,6 +31,8 @@
                 button2.innerText = "解析脑电数据";
                 const button3 = document.createElement('button');
                 button3.innerText = "画图";
+                const button4 = document.createElement('button');
+                button4.innerText = "显示电压";
                 const report = document.createElement('pre');
                 document.body.appendChild(container);
                 container.appendChild(input);
@@ -38,6 +40,7 @@
                 container.appendChild(button1);
                 container.appendChild(button2);
                 container.appendChild(button3);
+                container.appendChild(button4);
                 container.appendChild(report);
                 // input value 初始值是 queryString 中的 location
                 input.value = new URLSearchParams(window.location.search).get('location') || '';
@@ -162,11 +165,7 @@
                     const root = button3.div = document.createElement('div');
                     document.body.appendChild(root);
                     const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
-                    const draw = async (brain, title) => {
-                        const { focus, relax } = brain;
-                        if (!focus || !relax) {
-                            alert("数据不足，无法画图");
-                        }
+                    const draw = async (datas, title) => {
                         const container = document.createElement('div');
                         root.appendChild(container);
                         Object.assign(container.style, { width: '800px', height: '400px', });
@@ -187,8 +186,49 @@
                         await sleep(100);
                     }
                     draw(data?.before?.real, "实时脑波图");
-                    draw(data?.cache?.real, "缓存脑波图");
                 }
+                button4.onclick = async () => {
+                    report.innerHTML = "";
+                    if (button4.div) {
+                        document.body.removeChild(button4.div);
+                        button4.div = null;
+                    }
+                    const root = button4.div = document.createElement('div');
+                    document.body.appendChild(root);
+                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
+                    const draw = async (brain, title) => {
+                        if (!brain) {
+                            alert("数据不足，无法画图");
+                        }
+                        const container = document.createElement('div');
+                        root.appendChild(container);
+                        Object.assign(container.style, { width: '800px', height: '400px', });
+                        const mCharts = echarts.init(container);
+                        mCharts.setOption({
+                            title: { text: title },
+                            color: ['#73A8FF', '#987AF4'],
+                            xAxis: {
+                                type: 'category',
+                                data: Array(brain.length).fill(null).map((_, i) => ``),
+                                splitNumber: 1,
+                            },
+                            yAxis: { type: 'value', splitNumber: 1 },
+                            series: [brain].map((data, index) => {
+                                return { data: [null, ...data], type: 'line', smooth: true, name: ['放松度', '专注度'][index] }
+                            }),
+                            toolbox: {
+                                show: true,
+                                feature: {
+                                    //其他功能性按钮查看官网进行增加，包括（显示数据，下载图片，改为柱状图等）
+                                    dataZoom: [{ type: "inside" }],
+                                }
+                            },
+                        });
+                        await sleep(100);
+                    }
+                    draw(data?.originData?.before.map(b => b[0] / 18).flat(), "电压");
+                }
+
             })();
         })();
     </script>
