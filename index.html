@@ -214,7 +214,7 @@
                             },
                             yAxis: { type: 'value', splitNumber: 1 },
                             series: [brain].map((data, index) => {
-                                return { data: [null, ...data], type: 'line', smooth: true, name: ['放松度', '专注度'][index] }
+                                return { data: [null, ...data], type: 'line', name: ['放松度', '专注度'][index] }
                             }),
                             toolbox: {
                                 show: true,
