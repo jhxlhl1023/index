@@ -201,13 +201,28 @@
                         }
                         const container = document.createElement('div');
                         root.appendChild(container);
-                        Object.assign(container.style, { width: '800px', height: '400px', });
+                        Object.assign(container.style, { width: '100%', height: '400px', });
                         const mCharts = echarts.init(container);
                         mCharts.setOption({
+                            backgroundColor: "#eeeee2",
                             title: { text: title },
-                            color: ['#73A8FF', '#987AF4'],
-                            xAxis: { type: 'category', splitNumber: 10, },
-                            yAxis: { type: 'value', splitNumber: 10 },
+                            color: ['#B56525'],
+                            xAxis: {
+                                name: "时间/秒",
+                                type: 'category', splitNumber: 10,
+                                axisLabel: {
+                                    formatter: (value) => Math.ceil(value / 256)
+                                },
+                                nameLocation: "end"
+                            },
+                            yAxis: {
+                                name: `电压/uv: ${Math.round(Math.min(...brain))}~${Math.round(Math.max(...brain))}`,
+                                type: 'value', splitNumber: 10,
+                                axisLine: {
+                                    lineStyle: {}
+                                },
+
+                            },
                             series: [brain].map((data, index) => {
                                 return { data: data, type: 'line', name: '' }
                             }),
@@ -243,7 +258,7 @@
                         });
                         await sleep(100);
                     }
-                    draw(data?.originData?.before.map(b => b[0]).flat().map(b => b / 18), "电压");
+                    draw(data?.originData?.before.map(b => b[0]).flat().map(b => b / 18), "脑电数据");
                 }
 
             })();
