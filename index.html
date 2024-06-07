@@ -6,7 +6,6 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js"></script>
-    <script src="https://raw.githubusercontent.com/lodash/lodash/4.17.15-npm/lodash.js"></script>
     <script src="./peb.js"></script>
     <script defer>
         (async () => {
@@ -209,20 +208,43 @@
                             color: ['#73A8FF', '#987AF4'],
                             xAxis: {
                                 type: 'category',
-                                data: Array(brain.length).fill(null).map((_, i) => ``),
                                 splitNumber: 1,
                             },
                             yAxis: { type: 'value', splitNumber: 1 },
                             series: [brain].map((data, index) => {
                                 return { data: [null, ...data], type: 'line', name: ['放松度', '专注度'][index], symbol: 'none' }
                             }),
-                            toolbox: {
-                                show: true,
-                                feature: {
-                                    //其他功能性按钮查看官网进行增加，包括（显示数据，下载图片，改为柱状图等）
-                                    dataZoom: [{ type: "inside" }],
-                                }
-                            },
+
+                            //其他功能性按钮查看官网进行增加，包括（显示数据，下载图片，改为柱状图等）
+                            dataZoom: [
+                                {
+                                    type: 'slider',
+                                    show: true,
+                                    xAxisIndex: [0],
+                                    start: 0,
+                                    end: 100
+                                },
+                                {
+                                    type: 'slider',
+                                    show: true,
+                                    yAxisIndex: [0],
+                                    left: '93%',
+                                    start: 0,
+                                    end: 100
+                                },
+                                {
+                                    type: 'inside',
+                                    xAxisIndex: [0],
+                                    start: 0,
+                                    end: 100
+                                },
+                                {
+                                    type: 'inside',
+                                    yAxisIndex: [0],
+                                    start: 0,
+                                    end: 100
+                                }],
+
                         });
                         await sleep(100);
                     }
