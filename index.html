@@ -206,15 +206,11 @@
                         mCharts.setOption({
                             title: { text: title },
                             color: ['#73A8FF', '#987AF4'],
-                            xAxis: {
-                                type: 'category',
-                                splitNumber: 1,
-                            },
-                            yAxis: { type: 'value', splitNumber: 1 },
+                            xAxis: { type: 'category', splitNumber: 10, },
+                            yAxis: { type: 'value', splitNumber: 10 },
                             series: [brain].map((data, index) => {
-                                return { data: [null, ...data], type: 'line', name: ['放松度', '专注度'][index], symbol: 'none' }
+                                return { data: data, type: 'line', name: '' }
                             }),
-
                             //其他功能性按钮查看官网进行增加，包括（显示数据，下载图片，改为柱状图等）
                             dataZoom: [
                                 {
@@ -244,7 +240,6 @@
                                     start: 0,
                                     end: 100
                                 }],
-
                         });
                         await sleep(100);
                     }
