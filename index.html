@@ -166,6 +166,10 @@
                     document.body.appendChild(root);
                     const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
                     const draw = async (datas, title) => {
+                        const { focus, relax } = datas;
+                        if (!focus || !relax) {
+                            alert("数据不足，无法画图");
+                        }
                         const container = document.createElement('div');
                         root.appendChild(container);
                         Object.assign(container.style, { width: '800px', height: '400px', });
@@ -186,6 +190,7 @@
                         await sleep(100);
                     }
                     draw(data?.before?.real, "实时脑波图");
+                    draw(data?.cache?.real, "缓存脑波图");
                 }
                 button4.onclick = async () => {
                     report.innerHTML = "";
