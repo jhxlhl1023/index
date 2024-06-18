@@ -28,6 +28,8 @@
                 button1.innerText = "复制原始数据"
                 const button2 = document.createElement('button');
                 button2.innerText = "解析脑电数据";
+                const button22 = document.createElement('button');
+                button22.innerText = "解析脑电数据(NXJ)";
                 const button3 = document.createElement('button');
                 button3.innerText = "画图";
                 const button4 = document.createElement('button');
@@ -38,6 +40,7 @@
                 container.appendChild(button);
                 container.appendChild(button1);
                 container.appendChild(button2);
+                container.appendChild(button22);
                 container.appendChild(button3);
                 container.appendChild(button4);
                 container.appendChild(report);
@@ -45,7 +48,11 @@
                 input.value = new URLSearchParams(window.location.search).get('location') || '';
                 button.onclick = async () => {
                     report.innerHTML = "";
-                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
+                    if (input.value.startsWith("{")) {
+                        data = JSON.parse(input.value);
+                    } else {
+                        data = (await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`)).data;
+                    }
                     ['before', 'after', 'cache'].forEach((key) => {
                         const map = new Map();
                         (data.originData[key] || data.originData[`${key}_cmd_str`])?.forEach(([arr, signal]) => {
@@ -156,6 +163,25 @@
                     });
                     report.className = "report-flex";
                 }
+                button22.onclick = () => {
+                    report.innerHTML = "";
+                    const [...data] = input.value.replace(/\s/g, "").match(/../g).match(/../g);
+                    const colors = ['red', 'blue', 'green', 'grey'];
+                    const headers = ['24', '25', '2f', '30', '31', '32', '33', '34', '35', '36', '37', '38'];
+                    const end = '0A'
+                    const bytes = [];
+                    const cmds = [];
+                    data.forEach(byte => {
+                        bytes.push(byte);
+                        if (byte === end) {
+                            cmds.push([...bytes]);
+                            bytes.length = 0;
+                        }
+                    });
+                    const logDOM = document.createElement('div');
+                    report.appendChild(logDOM);
+                    // 
+                };
                 button3.onclick = async () => {
                     report.innerHTML = "";
                     if (button3.div) {
