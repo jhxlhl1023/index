@@ -1,336 +1,472 @@
 <!DOCTYPE html>
 <html>
-
-<head>
+  <head>
     <title>报告统计</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js"></script>
     <script src="./peb.js"></script>
     <script defer>
+      (async () => {
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        await sleep(200);
+        const baseUrl = "https://static1.coolbrainscience.cn";
         (async () => {
-            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-            await sleep(200);
-            const baseUrl = 'https://static1.coolbrainscience.cn';
-            (async () => {
-                const container = document.createElement('div');
-                Object.assign(container.style, {
-                    display: 'inline-flex',
-                    flexFlow: 'column nowrap',
-
+          const container = document.createElement("div");
+          Object.assign(container.style, {
+            display: "inline-flex",
+            flexFlow: "column nowrap",
+          });
+          const input = document.createElement("textarea");
+          input.style.width = "400px";
+          input.rows = 5;
+          const button = document.createElement("button");
+          button.innerText = "统计";
+          const button1 = document.createElement("button");
+          button1.innerText = "复制原始数据";
+          const button2 = document.createElement("button");
+          button2.innerText = "解析脑电数据";
+          const button22 = document.createElement("button");
+          button22.innerText = "解析脑电数据(NXJ)";
+          const button3 = document.createElement("button");
+          button3.innerText = "画图";
+          const button4 = document.createElement("button");
+          button4.innerText = "显示电压";
+          const report = document.createElement("div");
+          document.body.appendChild(container);
+          container.appendChild(input);
+          container.appendChild(button);
+          container.appendChild(button1);
+          container.appendChild(button2);
+          container.appendChild(button22);
+          container.appendChild(button3);
+          container.appendChild(button4);
+          container.appendChild(report);
+          // input value 初始值是 queryString 中的 location
+          input.value =
+            new URLSearchParams(window.location.search).get("location") || "";
+          button.onclick = async () => {
+            report.innerHTML = "";
+            if (input.value.startsWith("{")) {
+              data = JSON.parse(input.value);
+            } else {
+              data = (
+                await axios.get(
+                  input.value.startsWith("http")
+                    ? input.value
+                    : `${baseUrl}${input.value}`
+                )
+              ).data;
+            }
+            const tableDatas = [];
+            tableDatas.push(["APP 版本", data.appVersion || "未知"], []);
+            [
+              { key: "before", name: "干预前脑电" },
+              { key: "after", name: "干预后脑电" },
+              { key: "cache", name: "干预前(缓存)脑电" },
+            ].forEach(({ key, name }) => {
+              const qualityMap = new Map();
+              (
+                data.originData[key] || data.originData[`${key}_cmd_str`]
+              )?.forEach(([arr, signal]) => {
+                const key = `${arr.length}-${signal}`;
+                qualityMap.set(key, (qualityMap.get(key) || 0) + 1);
+              });
+              tableDatas.push(
+                [name],
+                [
+                  `放松度计数:${data[key]?.relax.length}`,
+                  `专注度计数:${data[key]?.focus.length}`,
+                ],
+                [
+                  "信号质量:",
+                  [...qualityMap.entries()]
+                    .sort()
+                    .map(([key, count]) => `${key}=>${count}`)
+                    .join(", "),
+                ]
+              );
+            });
+            const typeMap = new Map([
+              ["12", "干预总时间"],
+              ["18", "脑电状态"],
+              ["19", "干预状态"],
+              ["23", "脑电模组"],
+              ["17", "佩戴状态"],
+              ["10", "强度"],
+              ["11", "脑电总时间"],
+              ["1c", "干预总时间"],
+              ["24", "干预/音乐模式"],
+              ["1b", "脑电剩余时间"],
+              ["21", "脑电剩余时间"],
+              ["22", "干预剩余时间"],
+              ["13", "电量"],
+              ["14", "音量"],
+              ["15", "引导"],
+              ["1a", "工作阶段"],
+              ["1d", "软件版本"],
+              ["26", "硬件版本"],
+              ["16", "关机"],
+              ["25", "读取缓存"],
+              ["30", "重置设备"],
+              [
+                "31",
+                {
+                  name: "电压",
+                  parse: (value) => `${((value * 33) / 255).toFixed(2)}V`,
+                },
+              ],
+              ["32", "音量"],
+              ["33", "强度"],
+              ["34", "引导"],
+            ]);
+            tableDatas.push([], ["控制信号:"]);
+            data.originData.control.forEach(
+              ([timestamp, dire, command], index, arr) => {
+                const direction = dire === "GET" ? "接收" : "发送";
+                const typeObj = typeMap.get(command.substring(6, 8)) || "未知";
+                const [typeName, typeParse] =
+                  typeof typeObj === "string"
+                    ? [typeObj, (v) => v]
+                    : [typeObj.name, typeObj.parse];
+                const value = parseInt(command.slice(8, -2), 16);
+                if (arr[index - 1] && timestamp < arr[index - 1]?.[0]) {
+                  tableDatas.push();
+                  tableDatas.push([], ["【设备重连】"]);
+                }
+                tableDatas.push([
+                  `${dayjs(timestamp)
+                    .hour(0)
+                    .minute(0)
+                    .second(0)
+                    .add(timestamp, "millisecond")
+                    .format("mm:ss")} ${dire} ${command.padEnd(14, " ")}`,
+                  `[${direction}: ${typeName}=${typeParse(value)}]`,
+                ]);
+              }
+            );
+            // 移除 report 的所有子元素
+            while (report.firstChild) {
+              report.removeChild(report.firstChild);
+            }
+            if (report.tableStyle?.parentElement) {
+              report.tableStyle.parentElement.removeChild(report.tableStyle);
+              delete report.tableStyle;
+            }
+            /** @type { HTMLTableElement } */
+            let table;
+            tableDatas.forEach((rowData, rowIndex) => {
+              if (!table || rowData.length === 0) {
+                table = document.createElement("table");
+                table.className = "report-table";
+                report.appendChild(table);
+              }
+              if (rowData.length) {
+                const row = table.insertRow();
+                rowData.forEach((cellData, cellIndex) => {
+                  const cell = row.insertCell(cellIndex);
+                  cell.innerHTML = cellData;
                 });
-                const input = document.createElement('textarea');
-                input.style.width = '400px';
-                input.rows = 5;
-                const button = document.createElement('button');
-                button.innerText = "统计"
-                const button1 = document.createElement('button');
-                button1.innerText = "复制原始数据"
-                const button2 = document.createElement('button');
-                button2.innerText = "解析脑电数据";
-                const button22 = document.createElement('button');
-                button22.innerText = "解析脑电数据(NXJ)";
-                const button3 = document.createElement('button');
-                button3.innerText = "画图";
-                const button4 = document.createElement('button');
-                button4.innerText = "显示电压";
-                const report = document.createElement('pre');
-                document.body.appendChild(container);
-                container.appendChild(input);
-                container.appendChild(button);
-                container.appendChild(button1);
-                container.appendChild(button2);
-                container.appendChild(button22);
-                container.appendChild(button3);
-                container.appendChild(button4);
-                container.appendChild(report);
-                // input value 初始值是 queryString 中的 location
-                input.value = new URLSearchParams(window.location.search).get('location') || '';
-                button.onclick = async () => {
-                    report.innerHTML = "";
-                    if (input.value.startsWith("{")) {
-                        data = JSON.parse(input.value);
-                    } else {
-                        data = (await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`)).data;
-                    }
-                    ['before', 'after', 'cache'].forEach((key) => {
-                        const map = new Map();
-                        (data.originData[key] || data.originData[`${key}_cmd_str`])?.forEach(([arr, signal]) => {
-                            const key = `${arr.length}-${signal}`;
-                            map.set(key, (map.get(key) || 0) + 1);
-                        });
-                        report.innerText += `\n\n${key}:relax-count:${data[key]?.relax.length},focus-count:${data[key]?.focus.length},\n\n${[...map.entries()].map(([k, v]) => `${k} => ${v}`).join("\n")}`;
-                    });
-                    const typeMap = new Map([
-                        ['12', '干预总时间'],
-                        ['18', '脑电状态'],
-                        ['19', '干预状态'],
-                        ['23', '脑电模组'],
-                        ['17', '佩戴状态'],
-                        ['10', '强度'],
-                        ['11', '脑电总时间'],
-                        ['1c', '干预总时间'],
-                        ['24', '干预/音乐模式'],
-                        ['1b', '脑电剩余时间'],
-                        ['21', '脑电剩余时间'],
-                        ['22', '干预剩余时间'],
-                        ['13', '电量'],
-                        ['14', '音量'],
-                        ['15', '引导'],
-                        ['1a', '工作阶段'],
-                        ['1d', '软件版本'],
-                        ['26', '硬件版本'],
-                        ['16', '关机'],
-                        ['25', '读取缓存'],
-                        ['30', '重置设备'],
-                        ['31', { name: '电压', parse: (value) => `${(value * 33 / 255).toFixed(2)}V` }],
-                        ['32', '音量'],
-                        ['33', '强度'],
-                        ['34', '引导']
-                    ]);
-                    report.innerText += '\n\n控制信号:\n\n' + data.originData.control
-                        //.filter(([, , value]) => !value.startsWith('aabb0213'))
-                        .map(([
-                            timestamp, dire, command
-                        ], index, arr) => {
-                            const direction = dire === "GET" ? "接收" : "发送";
-                            const typeObj = typeMap.get(command.substring(6, 8)) || "未知";
-                            const [typeName, typeParse] = typeof typeObj === 'string' ? [typeObj, v => v] : [typeObj.name, typeObj.parse];
-                            const value = parseInt(command.slice(8, -2), 16);
-                            const res = `${dayjs(timestamp).hour(0).minute(0).second(0).add(timestamp, 'millisecond').format('mm:ss')} ${dire} ${command.padEnd(14, ' ')}   [${direction}: ${typeName}=${typeParse(value)}]`;
-                            if (arr[index - 1] && timestamp < arr[index - 1]?.[0]) {
-                                return `\n【设备重连】\n${res}`;
-                            } else {
-                                return res;
-                            }
-                        }).join('\n');
-                };
-                button1.onclick = async () => {
-                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
-                    const content = JSON.stringify(data.originData.before);
-                    // 复制到剪贴板
-                    (() => {
-                        const input = document.createElement('input');
-                        input.value = content;
-                        document.body.appendChild(input);
-                        input.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(input);
-                    })();
-                }
-                button2.onclick = () => {
-                    report.innerText = "";
-                    const parseBytes = parseEegBytes();
-                    const messages = input.value
-                        .split("\n")
-                        .filter((message) => {
-                            return !message.replace(/\s/g, "").toLowerCase().startsWith("aabb");
-                        })
-                        .filter(Boolean);
-                    const logMsgsArr = [];
-                    for (let i = 0; i < messages.length; i++) {
-                        const message = messages[i].toLowerCase();
-                        /** 
-                        /** @type { { type?: "sync" | "time" | "len" | "class" | "type" | "typeLen" | 'param' | 'check' | 'brain' | 'quality'; byte: string; log?: string } } */
-                        const logMsgs = parseBytes([
-                            ...message.replace(/\s/g, "").match(/../g),
-                        ]);
-                        logMsgsArr.push(logMsgs);
-                    }
-                    logMsgsArr.forEach((logMsgs) => {
-                        // 创建一行日志UI，根据不同的 type 使用红橙黄绿蓝靛紫等不同颜色
-                        const logDom = document.createElement('div');
-                        // 横向垂直居中
-                        const logs = [];
-                        logMsgs.forEach((msg) => {
-                            const { type, byte, log } = msg;
-                            const span = document.createElement('span');
-                            span.innerText = `${byte}`.toUpperCase();
-                            span.style.backgroundColor = ({
-                                "sync": "red", "len": "orange", "class": "green", "type": "blue", 'check': "brown", 'brain': "green", 'quality': "purple"
-                            })[type] || 'gray';
-                            logDom.appendChild(span);
-                            if (log) {
-                                logs.push(log);
-                            }
-                        });
-                        report.appendChild(logDom);
-                        if (logs.length > 0) {
-                            const pre = document.createElement('pre');
-                            pre.innerText = ["解析结果：", ...logs].join("\n");
-                            report.append(pre)
-                        }
-                    });
-                    report.className = "report-flex";
-                }
-                button22.onclick = () => {
-                    report.innerHTML = "";
-                    const [...data] = input.value.replace(/\s/g, "").match(/../g).match(/../g);
-                    const colors = ['red', 'blue', 'green', 'grey'];
-                    const headers = ['24', '25', '2f', '30', '31', '32', '33', '34', '35', '36', '37', '38'];
-                    const end = '0A'
-                    const bytes = [];
-                    const cmds = [];
-                    data.forEach(byte => {
-                        bytes.push(byte);
-                        if (byte === end) {
-                            cmds.push([...bytes]);
-                            bytes.length = 0;
-                        }
-                    });
-                    const logDOM = document.createElement('div');
-                    report.appendChild(logDOM);
-                    // 
-                };
-                button3.onclick = async () => {
-                    report.innerHTML = "";
-                    if (button3.div) {
-                        document.body.removeChild(button3.div);
-                        button3.div = null;
-                    }
-                    const root = button3.div = document.createElement('div');
-                    document.body.appendChild(root);
-                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
-                    const draw = async (datas, title) => {
-                        const { focus, relax } = datas;
-                        if (!focus || !relax) {
-                            alert("数据不足，无法画图");
-                        }
-                        const container = document.createElement('div');
-                        root.appendChild(container);
-                        Object.assign(container.style, { width: '800px', height: '400px', });
-                        const chart = echarts.init(container);
-                        chart.setOption({
-                            title: { text: title },
-                            color: ['#73A8FF', '#987AF4'],
-                            xAxis: {
-                                type: 'category',
-                                data: Array(Math.max(130, focus.length, relax.length)).fill(null).map((_, i) => `${i}s`),
-                                splitNumber: 1,
-                            },
-                            yAxis: { type: 'value', splitNumber: 1, min: -100, max: 100 },
-                            series: [focus, relax].map((data, index) => {
-                                return { data: [null, ...data], type: 'line', smooth: true, name: ['放松度', '专注度'][index] }
-                            })
-                        });
-                        await sleep(100);
-                    }
-                    draw(data?.before?.real, "实时脑波图");
-                    draw(data?.cache?.real, "缓存脑波图");
-                }
-                button4.onclick = async () => {
-                    report.innerHTML = "";
-                    if (button4.div) {
-                        document.body.removeChild(button4.div);
-                        button4.div = null;
-                    }
-                    const root = button4.div = document.createElement('div');
-                    document.body.appendChild(root);
-                    const { data } = await axios.get(input.value.startsWith('http') ? input.value : `${baseUrl}${input.value}`);
-                    const draw = async (brain, title) => {
-                        if (!brain) {
-                            alert("数据不足，无法画图");
-                        }
-                        const container = document.createElement('div');
-                        root.appendChild(container);
-                        Object.assign(container.style, { width: '100%', height: '400px', });
-                        const mCharts = echarts.init(container);
-                        mCharts.setOption({
-                            backgroundColor: "#eeeee2",
-                            title: { text: title },
-                            color: ['#B56525'],
-                            xAxis: {
-                                name: "时间/秒",
-                                type: 'category', splitNumber: 10,
-                                axisLabel: {
-                                    formatter: (value) => Math.ceil(value / 256)
-                                },
-                                nameLocation: "end"
-                            },
-                            yAxis: {
-                                name: `电压/uv: ${Math.round(Math.min(...brain))} ~ ${Math.round(Math.max(...brain))}`,
-                                type: 'value', splitNumber: 10,
-                                axisLine: {
-                                    lineStyle: {}
-                                },
-
-                            },
-                            series: [brain].map((data, index) => {
-                                return { data: data, type: 'line', name: '' }
-                            }),
-                            //其他功能性按钮查看官网进行增加，包括（显示数据，下载图片，改为柱状图等）
-                            dataZoom: [
-                                {
-                                    type: 'slider',
-                                    filterMode: "none",
-                                    show: true,
-                                    xAxisIndex: [0],
-                                    start: 0,
-                                    end: 100
-                                },
-                                {
-                                    type: 'slider',
-                                    filterMode: "none",
-                                    show: true,
-                                    yAxisIndex: [0],
-                                    left: '93%',
-                                    start: 0,
-                                    end: 100
-                                },
-                                {
-                                    type: 'inside',
-                                    filterMode: "none",
-                                    xAxisIndex: [0],
-                                    start: 0,
-                                    end: 100
-                                },
-                                {
-                                    type: 'inside',
-                                    filterMode: "none",
-                                    yAxisIndex: [0],
-                                    start: 0,
-                                    end: 100
-                                }],
-                        });
-                        await sleep(100);
-                    }
-                    draw(data?.originData?.before.map(b => b[0]).flat().map(b => b / 18), "脑电数据");
-                }
-
+              }
+            });
+            // 设置表格边框样式
+            const style = document.createElement("style");
+            report.tableStyle = style;
+            style.innerText = `
+            .report-table { border-collapse: collapse; border: none; margin: 0; padding: 0; }
+            .report-table td {border: 1px solid black;padding: 5px; font-size: 12px;margin:0;padding:2px;}
+            `;
+            document.head.appendChild(style);
+            Object.assign(report.style, {
+              display: "flex",
+              flexFlow: "column nowrap",
+              gap: "16px",
+              padding: "16px",
+            });
+          };
+          button1.onclick = async () => {
+            const { data } = await axios.get(
+              input.value.startsWith("http")
+                ? input.value
+                : `${baseUrl}${input.value}`
+            );
+            const content = JSON.stringify(data.originData.before);
+            // 复制到剪贴板
+            (() => {
+              const input = document.createElement("input");
+              input.value = content;
+              document.body.appendChild(input);
+              input.select();
+              document.execCommand("copy");
+              document.body.removeChild(input);
             })();
+          };
+          button2.onclick = () => {
+            report.innerText = "";
+            const parseBytes = parseEegBytes();
+            const messages = input.value
+              .split("\n")
+              .filter((message) => {
+                return !message
+                  .replace(/\s/g, "")
+                  .toLowerCase()
+                  .startsWith("aabb");
+              })
+              .filter(Boolean);
+            const logMsgsArr = [];
+            for (let i = 0; i < messages.length; i++) {
+              const message = messages[i].toLowerCase();
+              /** @type { { type?: "sync" | "time" | "len" | "class" | "type" | "typeLen" | 'param' | 'check' | 'brain' | 'quality'; byte: string; log?: string } } */
+              const logMsgs = parseBytes([
+                ...message.replace(/\s/g, "").match(/../g),
+              ]);
+              logMsgsArr.push(logMsgs);
+            }
+            logMsgsArr.forEach((logMsgs) => {
+              // 创建一行日志UI，根据不同的 type 使用红橙黄绿蓝靛紫等不同颜色
+              const logDom = document.createElement("div");
+              // 横向垂直居中
+              const logs = [];
+              logMsgs.forEach((msg) => {
+                const { type, byte, log } = msg;
+                const span = document.createElement("span");
+                span.innerText = `${byte}`.toUpperCase();
+                span.style.backgroundColor =
+                  {
+                    sync: "red",
+                    len: "orange",
+                    class: "green",
+                    type: "blue",
+                    check: "brown",
+                    brain: "green",
+                    quality: "purple",
+                  }[type] || "gray";
+                logDom.appendChild(span);
+                if (log) {
+                  logs.push(log);
+                }
+              });
+              report.appendChild(logDom);
+              if (logs.length > 0) {
+                const pre = document.createElement("pre");
+                pre.innerText = ["解析结果：", ...logs].join("\n");
+                report.append(pre);
+              }
+            });
+            report.className = "report-flex";
+          };
+          button22.onclick = () => {
+            report.innerHTML = "";
+            const [...data] = input.value
+              .replace(/\s/g, "")
+              .match(/../g)
+              .match(/../g);
+            const colors = ["red", "blue", "green", "grey"];
+            const headers = [
+              "24",
+              "25",
+              "2f",
+              "30",
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "37",
+              "38",
+            ];
+            const end = "0A";
+            const bytes = [];
+            const cmds = [];
+            data.forEach((byte) => {
+              bytes.push(byte);
+              if (byte === end) {
+                cmds.push([...bytes]);
+                bytes.length = 0;
+              }
+            });
+            const logDOM = document.createElement("div");
+            report.appendChild(logDOM);
+            //
+          };
+          button3.onclick = async () => {
+            report.innerHTML = "";
+            if (button3.div) {
+              document.body.removeChild(button3.div);
+              button3.div = null;
+            }
+            const root = (button3.div = document.createElement("div"));
+            document.body.appendChild(root);
+            const { data } = await axios.get(
+              input.value.startsWith("http")
+                ? input.value
+                : `${baseUrl}${input.value}`
+            );
+            const draw = async (datas, title) => {
+              const { focus, relax } = datas;
+              if (!focus || !relax) {
+                alert("数据不足，无法画图");
+              }
+              const container = document.createElement("div");
+              root.appendChild(container);
+              Object.assign(container.style, {
+                width: "800px",
+                height: "400px",
+              });
+              const chart = echarts.init(container);
+              chart.setOption({
+                title: { text: title },
+                color: ["#73A8FF", "#987AF4"],
+                xAxis: {
+                  type: "category",
+                  data: Array(Math.max(130, focus.length, relax.length))
+                    .fill(null)
+                    .map((_, i) => `${i}s`),
+                  splitNumber: 1,
+                },
+                yAxis: { type: "value", splitNumber: 1, min: -100, max: 100 },
+                series: [focus, relax].map((data, index) => {
+                  return {
+                    data: [null, ...data],
+                    type: "line",
+                    smooth: true,
+                    name: ["放松度", "专注度"][index],
+                  };
+                }),
+              });
+              await sleep(100);
+            };
+            draw(data?.before?.real, "实时脑波图");
+            draw(data?.cache?.real, "缓存脑波图");
+          };
+          button4.onclick = async () => {
+            report.innerHTML = "";
+            if (button4.div) {
+              document.body.removeChild(button4.div);
+              button4.div = null;
+            }
+            const root = (button4.div = document.createElement("div"));
+            document.body.appendChild(root);
+            const { data } = await axios.get(
+              input.value.startsWith("http")
+                ? input.value
+                : `${baseUrl}${input.value}`
+            );
+            const draw = async (brain, title) => {
+              if (!brain) {
+                alert("数据不足，无法画图");
+              }
+              const container = document.createElement("div");
+              root.appendChild(container);
+              Object.assign(container.style, {
+                width: "100%",
+                height: "400px",
+              });
+              const mCharts = echarts.init(container);
+              mCharts.setOption({
+                backgroundColor: "#eeeee2",
+                title: { text: title },
+                color: ["#B56525"],
+                xAxis: {
+                  name: "时间/秒",
+                  type: "category",
+                  splitNumber: 10,
+                  axisLabel: {
+                    formatter: (value) => Math.ceil(value / 256),
+                  },
+                  nameLocation: "end",
+                },
+                yAxis: {
+                  name: `电压/uv: ${Math.round(
+                    Math.min(...brain)
+                  )} ~ ${Math.round(Math.max(...brain))}`,
+                  type: "value",
+                  splitNumber: 10,
+                  axisLine: {
+                    lineStyle: {},
+                  },
+                },
+                series: [brain].map((data, index) => {
+                  return { data: data, type: "line", name: "" };
+                }),
+                //其他功能性按钮查看官网进行增加，包括（显示数据，下载图片，改为柱状图等）
+                dataZoom: [
+                  {
+                    type: "slider",
+                    filterMode: "none",
+                    show: true,
+                    xAxisIndex: [0],
+                    start: 0,
+                    end: 100,
+                  },
+                  {
+                    type: "slider",
+                    filterMode: "none",
+                    show: true,
+                    yAxisIndex: [0],
+                    left: "93%",
+                    start: 0,
+                    end: 100,
+                  },
+                  {
+                    type: "inside",
+                    filterMode: "none",
+                    xAxisIndex: [0],
+                    start: 0,
+                    end: 100,
+                  },
+                  {
+                    type: "inside",
+                    filterMode: "none",
+                    yAxisIndex: [0],
+                    start: 0,
+                    end: 100,
+                  },
+                ],
+              });
+              await sleep(100);
+            };
+            draw(
+              data?.originData?.before
+                .map((b) => b[0])
+                .flat()
+                .map((b) => b / 18),
+              "脑电数据"
+            );
+          };
         })();
+      })();
     </script>
     <style>
-        .report-flex {
-            background-color: #33333310;
-            display: flex;
-            flex-flow: column nowrap;
-            gap: 0.5em;
+      .report-flex {
+        background-color: #33333310;
+        display: flex;
+        flex-flow: column nowrap;
+        gap: 0.5em;
+      }
 
-        }
+      .report-flex > div {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        gap: 0.5em;
+      }
 
-        .report-flex>div {
-            display: flex;
-            flex-flow: row nowrap;
-            align-items: center;
-            gap: 0.5em;
-        }
+      .report-flex > pre {
+        color: red;
+      }
 
-        .report-flex>pre {
-            color: red;
-        }
-
-        .report-flex>div>span {
-            display: inline-block;
-            padding-right: 0.5em;
-            margin-right: -0.5em;
-            color: #ffffff;
-        }
+      .report-flex > div > span {
+        display: inline-block;
+        padding-right: 0.5em;
+        margin-right: -0.5em;
+        color: #ffffff;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div id="main"></div>
-</body>
-
+  </body>
 </html>
