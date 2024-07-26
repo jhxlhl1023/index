@@ -257,38 +257,77 @@
           };
           button22.onclick = () => {
             report.innerHTML = "";
-            const [...data] = input.value
-              .replace(/\s/g, "")
-              .match(/../g)
-              .match(/../g);
-            const colors = ["red", "blue", "green", "grey"];
-            const headers = [
-              "24",
-              "25",
-              "2f",
-              "30",
-              "31",
-              "32",
-              "33",
-              "34",
-              "35",
-              "36",
-              "37",
-              "38",
-            ];
-            const end = "0A";
-            const bytes = [];
-            const cmds = [];
-            data.forEach((byte) => {
-              bytes.push(byte);
-              if (byte === end) {
-                cmds.push([...bytes]);
-                bytes.length = 0;
+            const [...bytes] = input.value.replace(/\s|\n/g, "").match(/../g);
+            const errorColor = "red";
+            const colors = ["green", "blue", "grey", "orange"];
+            const meanings = ["报头", "长度", "内容", "校验"];
+            const headers = ["AA", "CC"];
+            let data = [];
+            let doms = [];
+            let dataLength = undefined;
+            const logDOM = document.createElement("div");
+            Object.assign(logDOM.style, {
+              display: "flex",
+              flexFlow: "row wrap",
+              gap: "1em",
+              width: "400px",
+            });
+            report.appendChild(logDOM);
+            bytes.forEach((_byte) => {
+              const byte = _byte;
+              // 当前收到等于报头第二个字节，若上一个字节是报头第一个字节，则说明是新的报文
+              const span = document.createElement("span");
+              span.style.marginRight = "-1em";
+              span.style.paddingLeft = "1em";
+              span.innerHTML = byte;
+              logDOM.appendChild(span);
+              if (byte === headers[1] && data.slice(-1)[0] === headers[0]) {
+                data = [...headers];
+                // 上一个背景色改为报头色
+                const [header0] = doms.slice(-1);
+                header0.style.backgroundColor = colors[0];
+                // 剩下的文字色改为错误色
+                const others = doms.slice(0, -1);
+                others.forEach((dom) => (dom.style.color = errorColor));
+                // 重置报头
+                doms = [header0, span];
+                dataLength = undefined;
+              } else {
+                data.push(byte);
+                doms.push(span);
+              }
+              if (data[0] !== headers[0] || data[1] !== headers[1]) {
+                // 未收到报头
+              } else if (data.length < 2) {
+                // 跳过
+              } else if (data.length === 2) {
+                doms.forEach((dom) => (dom.style.backgroundColor = colors[0]));
+              } else if (data.length === 3) {
+                dataLength = parseInt(byte, 16);
+                span.style.backgroundColor = colors[1];
+              } else if (typeof dataLength !== "number") {
+                throw new Error("没有读到长度");
+              } else if (data.length <= 3 + dataLength) {
+                span.style.backgroundColor = colors[2];
+              } else {
+                span.style.backgroundColor = colors[3];
+                // 收到校验数据
+                const calcuNum =
+                  data
+                    .slice(-1)
+                    .map((v) => parseInt(v, 16))
+                    .reduce((a, b) => a + b) & 0xff;
+                const checkNum = parseInt(byte, 16);
+                if (calcuNum === checkNum) {
+                  // 校验成功
+                } else {
+                  span.style.color = errorColor;
+                  // 校验失败
+                }
+                data = [];
+                doms = [];
               }
             });
-            const logDOM = document.createElement("div");
-            report.appendChild(logDOM);
-            //
           };
           button3.onclick = async () => {
             report.innerHTML = "";
