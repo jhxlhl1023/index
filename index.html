@@ -268,27 +268,29 @@
             const logDOM = document.createElement("div");
             Object.assign(logDOM.style, {
               display: "flex",
-              flexFlow: "row wrap",
-              gap: "1em",
-              width: "400px",
+              flexFlow: "column nowrap",
             });
             report.appendChild(logDOM);
             for (let i = 0; i < bytes.length; i++) {
               const byte = bytes[i];
               // 当前收到等于报头第二个字节，若上一个字节是报头第一个字节，则说明是新的报文
               const span = document.createElement("span");
-              span.style.marginRight = "-1em";
-              span.style.paddingLeft = "1em";
+              span.style.padding = "0.5em";
               span.innerHTML = byte;
-              logDOM.appendChild(span);
               if (byte === headers[1] && data.slice(-1)[0] === headers[0]) {
                 data = [...headers];
                 // 上一个背景色改为报头色
                 const [header0] = doms.slice(-1);
                 header0.style.backgroundColor = colors[0];
                 // 剩下的文字色改为错误色
-                const others = doms.slice(0, -1);
-                others.forEach((dom) => (dom.style.color = errorColor));
+                const befores = doms.slice(0, -1);
+                befores.forEach((dom) => (dom.style.color = errorColor));
+                const line = document.createElement("div");
+                line.style.display = "flex";
+                line.style.flexFlow = "row nowrap";
+                
+                befores.forEach((dom) => line.appendChild(dom));
+                logDOM.appendChild(line);
                 // 重置报头
                 doms = [header0, span];
                 dataLength = undefined;
@@ -318,12 +320,16 @@
                 const checkNum = parseInt(byte, 16);
                 if (calcNum === checkNum) {
                   console.log("校验成功");
-                  span.innerText += "成功";
                 } else {
                   console.log("校验失败");
-                  span.innerText;
                   doms.forEach((dom) => (dom.style.color = errorColor));
                 }
+                const line = document.createElement("div");
+                line.style.display = "flex";
+                line.style.flexFlow = "row nowrap";
+                
+                doms.forEach((dom) => line.appendChild(dom));
+                logDOM.appendChild(line);
                 data = [];
                 doms = [];
                 dataLength = undefined;
@@ -332,6 +338,12 @@
                 throw new Error("解析逻辑错误");
               }
             }
+            const line = document.createElement("div");
+            line.style.display = "flex";
+            line.style.flexFlow = "row nowrap";
+            
+            doms.forEach((dom) => line.appendChild(dom));
+            logDOM.appendChild(line);
           };
           button3.onclick = async () => {
             report.innerHTML = "";
